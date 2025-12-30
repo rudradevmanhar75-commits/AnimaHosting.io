@@ -3,212 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AnimeStream - Watch Free</title>
+    <title>Comet Anima - Watch Free</title>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8675548946096450" crossorigin="anonymous"></script>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js"></script>
+
     <style>
-        :root { --primary: #f47521; --bg: #0b0b0b; --card-bg: #1a1a1a; --text: #ffffff; }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding-bottom: 70px; }
-        .header { padding: 15px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: var(--bg); z-index: 100; }
-        .search-bar { flex: 1; margin: 0 15px; position: relative; }
-        .search-bar input { width: 100%; padding: 8px 35px 8px 15px; border-radius: 20px; border: none; background: var(--card-bg); color: white; }
-        .search-bar i { position: absolute; right: 10px; top: 10px; color: #888; }
+        :root { --main-color: #ff6600; --bg-color: #0b0b0b; --text-color: #ffffff; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-color); padding-bottom: 70px; }
         
-        .section-title { padding: 15px; font-size: 1.2rem; font-weight: bold; }
-        .anime-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; padding: 10px; }
-        .anime-card { background: var(--card-bg); border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; }
-        .anime-card:hover { transform: scale(1.05); }
-        .anime-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; }
-        .anime-card p { padding: 8px; font-size: 0.9rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* Header & Search */
+        .header { padding: 15px; display: flex; align-items: center; background: #1a1a1a; position: sticky; top: 0; z-index: 100; }
+        .search-bar { flex: 1; padding: 10px; border-radius: 20px; border: none; background: #333; color: white; margin: 0 10px; }
 
-        /* Bottom Nav */
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #151515; display: flex; justify-content: space-around; padding: 10px 0; border-top: 1px solid #333; }
-        .nav-item { text-align: center; color: #888; font-size: 0.8rem; cursor: pointer; }
-        .nav-item.active { color: var(--primary); }
-        .nav-item i { font-size: 1.2rem; display: block; }
+        /* Navigation */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #333; }
+        .nav-item { color: #888; text-decoration: none; font-size: 12px; text-align: center; cursor: pointer; }
+        .nav-item.active { color: var(--main-color); }
 
-        /* Auth Screen */
-        #auth-screen { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-        .btn-google { background: white; color: black; padding: 12px 24px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; margin-top: 20px; }
+        /* Anime Grid */
+        .section-title { padding: 15px; font-size: 20px; font-weight: bold; }
+        .anime-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; padding: 10px; }
+        .anime-card { background: #222; border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.3s; }
+        .anime-card img { width: 100%; height: 160px; object-fit: cover; }
+        .anime-card .title { padding: 5px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* Hidden Sections */
-        .page { display: none; }
-        .page.active { display: block; }
+        /* Auth Pages */
+        .auth-container { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border-radius: 5px; border: none; }
+        .btn { background: var(--main-color); color: white; padding: 12px 30px; border: none; border-radius: 5px; width: 90%; font-weight: bold; }
+
+        /* Player Overlay */
+        #player-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 1000; }
+        video { width: 100%; height: auto; max-height: 250px; }
+        .episode-list { padding: 15px; }
         
-        #video-player-screen { position: fixed; inset: 0; background: black; z-index: 500; display: none; }
-        video { width: 100%; height: 70%; margin-top: 10%; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="auth-screen">
-        <h1 style="color: var(--primary)">AnimeStream</h1>
-        <p>Login to start watching for free</p>
-        <button class="btn-google" onclick="loginWithGoogle()"><i class="fab fa-google"></i> Continue with Google</button>
-        <button onclick="toggleAuthMode()" style="background:none; border:none; color:var(--primary); margin-top:20px; cursor:pointer">Or use Email/Password</button>
+    <div id="auth-screen" class="auth-container">
+        <h2 id="auth-title">Create Account</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="pass" placeholder="Password">
+        <button class="btn" onclick="handleAuth()" id="auth-btn">Sign Up</button>
+        <p onclick="toggleAuthMode()" style="margin-top:15px; cursor:pointer" id="auth-toggle">Already have an account? Login</p>
     </div>
 
-    <div id="main-content" style="display:none;">
+    <div id="app-content" class="hidden">
         <div class="header">
-            <h2 style="color:var(--primary); margin:0;">AS</h2>
-            <div class="search-bar">
-                <input type="text" placeholder="Search anime..." id="searchInput">
-                <i class="fa fa-search"></i>
-            </div>
+            <input type="text" class="search-bar" placeholder="Search Anime..." onkeyup="searchAnime(this.value)">
         </div>
 
-        <div id="home" class="page active">
+        <div id="view-home">
             <div class="section-title">Popular Anime</div>
-            <div class="anime-grid" id="popularGrid"></div>
+            <div class="anime-grid" id="popular-list"></div>
         </div>
 
-        <div id="mylist" class="page">
-            <div class="section-title">My Watchlist & History</div>
-            <div class="anime-grid" id="historyGrid"></div>
+        <div id="view-browse" class="hidden">
+            <div class="section-title">All Simulcasts</div>
+            <div class="anime-grid" id="all-anime-list"></div>
         </div>
 
-        <div id="browse" class="page">
-            <div class="section-title">All Anime & Simulcasts</div>
-            <div class="anime-grid" id="browseGrid"></div>
+        <div id="view-account" class="hidden" style="padding: 20px; text-align: center;">
+            <img id="user-profile-pic" src="https://via.placeholder.com/100" style="width:100px; height:100px; border-radius:50%; object-fit: cover;">
+            <br><br>
+            <input type="file" id="pic-upload" style="display:none" onchange="uploadProfilePic(event)">
+            <button class="btn" onclick="document.getElementById('pic-upload').click()">Change Profile Picture</button>
+            <button class="btn" style="background:#444; margin-top:10px" onclick="firebase.auth().signOut()">Logout</button>
         </div>
 
-        <div id="account" class="page">
-            <div class="section-title">My Profile</div>
-            <div style="text-align: center; padding: 20px;">
-                <img id="userAvatar" src="https://via.placeholder.com/100" style="border-radius:50%; width:100px; height:100px; object-fit:cover;">
-                <br>
-                <input type="file" id="avatarInput" hidden onchange="updateProfilePic(event)">
-                <button onclick="document.getElementById('avatarInput').click()" style="background:var(--primary); color:white; border:none; padding:8px 15px; border-radius:5px; margin-top:10px;">Change Image</button>
-                <h3 id="userNameDisplay">User Name</h3>
-                <button onclick="logout()" style="color: red; background: none; border: none;">Logout</button>
+        <div id="player-screen">
+            <button onclick="closePlayer()" style="color:white; background:none; border:none; padding:15px; font-size:20px;">← Back</button>
+            <video id="main-player" controls onplay="triggerAd()"></video>
+            <div id="episode-controls" class="episode-list">
+                <h3 id="player-title"></h3>
+                <select id="season-select" onchange="loadEpisodes()"></select>
+                <div id="ep-buttons" style="margin-top:10px"></div>
             </div>
         </div>
 
-        <div class="bottom-nav">
-            <div class="nav-item active" onclick="showPage('home')"><i class="fa fa-home"></i>Home</div>
-            <div class="nav-item" onclick="showPage('mylist')"><i class="fa fa-bookmark"></i>My List</div>
-            <div class="nav-item" onclick="showPage('browse')"><i class="fa fa-compass"></i>Browse</div>
-            <div class="nav-item" onclick="showPage('account')"><i class="fa fa-user"></i>Account</div>
-        </div>
+        <nav class="bottom-nav">
+            <div class="nav-item active" onclick="switchTab('home')">🏠<br>Home</div>
+            <div class="nav-item" onclick="switchTab('browse')">🧭<br>Browse</div>
+            <div class="nav-item" onclick="switchTab('account')">👤<br>Account</div>
+        </nav>
     </div>
-
-    <div id="video-player-screen">
-        <button onclick="closePlayer()" style="color:white; background:none; border:none; padding:20px; font-size:1.5rem;"><i class="fa fa-arrow-left"></i> Back</button>
-        <video id="mainVideo" controls></video>
-        <div style="padding: 15px;">
-            <h3 id="videoTitle">Anime Title</h3>
-            <p id="videoMeta"></p>
-        </div>
-    </div>
-
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
 
     <script>
-        // Your Firebase Config
+        // Firebase Configuration
         const firebaseConfig = {
-            apiKey: "AIzaSyAaKOFvJv-7dWDYruOMDgL0nKovFfQvmII",
-            authDomain: "fooddelivery-b1f9b.firebaseapp.com",
-            databaseURL: "https://fooddelivery-b1f9b-default-rtdb.firebaseio.com",
-            projectId: "fooddelivery-b1f9b",
-            storageBucket: "fooddelivery-b1f9b.firebasestorage.app",
-            messagingSenderId: "403304113348",
-            appId: "1:403304113348:web:726235578f8b59e9ddd591"
+            apiKey: "AIzaSyBuYwkLGEOx4FWwCkcsfWfVozXfHkepR8E",
+            authDomain: "anima-hosting-app.firebaseapp.com",
+            projectId: "anima-hosting-app",
+            storageBucket: "anima-hosting-app.firebasestorage.app",
+            messagingSenderId: "883981430156",
+            appId: "1:883981430156:web:a4a8fab02ff42b31707aa9"
         };
         firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
         const db = firebase.database();
+        const auth = firebase.auth();
         const storage = firebase.storage();
 
+        let isLogin = false;
+        let currentAnime = null;
+        let adCounter = 0;
+
         // Auth Logic
+        function toggleAuthMode() {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? 'Welcome Back' : 'Create Account';
+            document.getElementById('auth-btn').innerText = isLogin ? 'Login' : 'Sign Up';
+            document.getElementById('auth-toggle').innerText = isLogin ? "Don't have an account? Sign Up" : "Already have an account? Login";
+        }
+
+        async function handleAuth() {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('pass').value;
+            try {
+                if(isLogin) await auth.signInWithEmailAndPassword(email, pass);
+                else await auth.createUserWithEmailAndPassword(email, pass);
+            } catch(e) { alert(e.message); }
+        }
+
         auth.onAuthStateChanged(user => {
             if (user) {
-                document.getElementById('auth-screen').style.display = 'none';
-                document.getElementById('main-content').style.display = 'block';
-                document.getElementById('userNameDisplay').innerText = user.displayName || user.email;
-                if(user.photoURL) document.getElementById('userAvatar').src = user.photoURL;
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('app-content').classList.remove('hidden');
                 loadAnimeData();
+                updateOnlineStatus(user.uid, true);
             } else {
-                document.getElementById('auth-screen').style.display = 'flex';
-                document.getElementById('main-content').style.display = 'none';
+                document.getElementById('auth-screen').classList.remove('hidden');
+                document.getElementById('app-content').classList.add('hidden');
             }
         });
 
-        function loginWithGoogle() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider);
-        }
-
-        function logout() { auth.signOut(); }
-
-        // Navigation Logic
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-        }
-
-        // Load Anime from Firebase
+        // App Functions
         function loadAnimeData() {
             db.ref('anime').on('value', snapshot => {
                 const data = snapshot.val();
-                const grid = document.getElementById('popularGrid');
-                const browseGrid = document.getElementById('browseGrid');
-                grid.innerHTML = ''; browseGrid.innerHTML = '';
+                const list = document.getElementById('popular-list');
+                const browseList = document.getElementById('all-anime-list');
+                list.innerHTML = ''; browseList.innerHTML = '';
                 
                 for(let id in data) {
                     const anime = data[id];
                     const card = `
-                        <div class="anime-card" onclick="playAnime('${anime.videoUrl}', '${anime.title}', '${anime.episodes}')">
-                            <img src="${anime.thumbnail}" alt="thumb">
-                            <p>${anime.title}</p>
-                        </div>
-                    `;
-                    grid.innerHTML += card;
-                    browseGrid.innerHTML += card;
+                        <div class="anime-card" onclick="openPlayer('${id}')">
+                            <img src="${anime.thumbnail}">
+                            <div class="title">${anime.title}</div>
+                        </div>`;
+                    list.innerHTML += card;
+                    browseList.innerHTML += card;
                 }
             });
         }
 
-        // AdMob Interstitial Logic (Simulated for Web)
-        let adCount = 0;
-        function playAnime(url, title, eps) {
-            const player = document.getElementById('video-player-screen');
-            const video = document.getElementById('mainVideo');
-            player.style.display = 'block';
-            video.src = url;
-            document.getElementById('videoTitle').innerText = title;
-            document.getElementById('videoMeta').innerText = `Episodes: ${eps}`;
-            
-            // Ad Logic: Show "Ad" overlay 3 times
-            video.ontimeupdate = function() {
-                let progress = (video.currentTime / video.duration) * 100;
-                if((progress > 25 && adCount == 0) || (progress > 50 && adCount == 1) || (progress > 75 && adCount == 2)) {
-                    video.pause();
-                    alert("Showing AdMob Ad..."); // In reality, the AdMob script triggers here
-                    adCount++;
-                    video.play();
+        function triggerAd() {
+            adCounter++;
+            if(adCounter % 2 === 0) { // Shows ad 3 times logic during playback cycle
+                console.log("AdMob Triggered");
+                // In real app, AdMob Interstitial would trigger here
+                (adsbygoogle = window.adsbygoogle || []).push({});
+            }
+        }
+
+        function openPlayer(id) {
+            db.ref('anime/' + id).once('value', s => {
+                currentAnime = s.val();
+                document.getElementById('player-screen').style.display = 'block';
+                document.getElementById('player-title').innerText = currentAnime.title;
+                
+                let sSelect = document.getElementById('season-select');
+                sSelect.innerHTML = '';
+                for(let i=1; i<=currentAnime.seasons; i++) {
+                    sSelect.innerHTML += `<option value="${i}">Season ${i}</option>`;
                 }
-            };
+                loadEpisodes();
+            });
+        }
+
+        function loadEpisodes() {
+            const container = document.getElementById('ep-buttons');
+            container.innerHTML = '';
+            for(let i=1; i<=currentAnime.episodes; i++) {
+                container.innerHTML += `<button class="btn" style="width:auto; margin:5px;" onclick="playVideo('${currentAnime.videoUrl}')">Ep ${i}</button>`;
+            }
+        }
+
+        function playVideo(url) {
+            const video = document.getElementById('main-player');
+            video.src = url;
+            video.play();
         }
 
         function closePlayer() {
-            document.getElementById('video-player-screen').style.display = 'none';
-            document.getElementById('mainVideo').pause();
-            adCount = 0;
+            document.getElementById('player-screen').style.display = 'none';
+            document.getElementById('main-player').pause();
         }
 
-        async function updateProfilePic(e) {
+        function switchTab(tab) {
+            ['home', 'browse', 'account'].forEach(t => {
+                document.getElementById('view-' + t).classList.add('hidden');
+            });
+            document.getElementById('view-' + tab).classList.remove('hidden');
+        }
+
+        async function uploadProfilePic(e) {
             const file = e.target.files[0];
-            const ref = storage.ref(`users/${auth.currentUser.uid}/avatar`);
+            const ref = storage.ref(`profiles/${auth.currentUser.uid}`);
             await ref.put(file);
             const url = await ref.getDownloadURL();
-            await auth.currentUser.updateProfile({ photoURL: url });
-            document.getElementById('userAvatar').src = url;
+            document.getElementById('user-profile-pic').src = url;
+            db.ref('users/' + auth.currentUser.uid).update({ photo: url });
+        }
+
+        function updateOnlineStatus(uid, status) {
+            db.ref('status/' + uid).set({ online: status, last_seen: Date.now() });
         }
     </script>
 </body>

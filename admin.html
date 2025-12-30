@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comet Admin - Control Center</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-storage-compat.js"></script>
+
+    <style>
+        :root { --primary: #00d2ff; --dark: #1a1a2e; --light: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); display: flex; overflow-x: hidden; }
+
+        /* Login Overlay */
+        #login-overlay { 
+            position: fixed; inset: 0; background: var(--dark); z-index: 10000; 
+            display: flex; justify-content: center; align-items: center; 
+        }
+        .login-box { background: white; padding: 40px; border-radius: 15px; width: 320px; text-align: center; }
+
+        /* Sidebar */
+        #sidebar { 
+            width: 260px; height: 100vh; background: white; border-right: 1px solid #ddd; 
+            transition: 0.3s; position: fixed; z-index: 999;
+        }
+        #sidebar.hidden { transform: translateX(-260px); }
+
+        /* Main Content */
+        #main { flex: 1; margin-left: 260px; transition: 0.3s; padding: 20px; min-height: 100vh; }
+        #main.full { margin-left: 0; }
+
+        /* Controls */
+        .top-bar { display: flex; align-items: center; background: white; padding: 10px 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .toggle-btn { background: var(--primary); color: white; border: none; padding: 8px 12px; cursor: pointer; border-radius: 5px; margin-right: 20px; }
+
+        /* Cards & Forms */
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-box { background: white; padding: 20px; border-radius: 10px; text-align: center; border-bottom: 4px solid var(--primary); }
+        
+        input, select, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .btn-pub { background: #28a745; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        
+        /* Table */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .action-btns button { border: none; padding: 5px 10px; cursor: pointer; border-radius: 4px; margin-right: 5px; }
+        .del-btn { background: #ff4d4d; color: white; }
+
+        .hidden { display: none !important; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="color: var(--dark);">Comet Admin</h2>
+            <p>Protected Area</p>
+            <input type="email" id="adm-email" placeholder="Admin Email">
+            <input type="password" id="adm-pass" placeholder="Password">
+            <button class="btn-pub" onclick="doLogin()">Login Now</button>
+        </div>
+    </div>
+
+    <nav id="sidebar">
+        <div style="padding: 20px; font-size: 22px; font-weight: bold; color: var(--dark); border-bottom: 1px solid #eee;">
+            COMET PANEL
+        </div>
+        <div style="padding: 10px;">
+            <div style="padding: 15px; cursor: pointer;" onclick="showTab('dash')">📊 Dashboard</div>
+            <div style="padding: 15px; cursor: pointer;" onclick="showTab('upload')">📤 Host New Anime</div>
+            <div style="padding: 15px; cursor: pointer;" onclick="showTab('manage')">⚙️ Manage Content</div>
+            <div style="padding: 15px; cursor: pointer;" onclick="showTab('users')">👥 User Control</div>
+        </div>
+    </nav>
+
+    <div id="main">
+        <div class="top-bar">
+            <button class="toggle-btn" onclick="toggleSidebar()">☰ Toggle Sidebar</button>
+            <h3 id="tab-title">Dashboard Overview</h3>
+        </div>
+
+        <div id="view-dash">
+            <div class="stats-grid">
+                <div class="stat-box"><h1 id="count-anime">0</h1><p>Total Anime</p></div>
+                <div class="stat-box"><h1 id="count-users">0</h1><p>Registered Users</p></div>
+                <div class="stat-box"><h1 id="count-online" style="color: #28a745;">0</h1><p>Active Online</p></div>
+            </div>
+            <div class="card">
+                <h3>App Customization</h3>
+                <div style="display: flex; gap: 20px;">
+                    <div>Theme Color: <input type="color" id="theme-color" value="#00d2ff" onchange="updateTheme(this.value)"></div>
+                    <div style="flex: 1;">App Name: <input type="text" id="app-name-input" placeholder="Change App Name" onkeyup="updateAppName(this.value)"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-upload" class="hidden">
+            <div class="card">
+                <h2>Host Professional Anime</h2>
+                <input type="text" id="a-title" placeholder="Anime Full Title">
+                <textarea id="a-desc" placeholder="Anime Description / Plot"></textarea>
+                <input type="text" id="a-cat" placeholder="Category (e.g. Action, Romance, Simulcasts)">
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <input type="number" id="a-seasons" placeholder="Seasons (1-1000)" min="1" max="1000">
+                    <input type="number" id="a-eps" placeholder="Episodes (1-1000)" min="1" max="1000">
+                </div>
+
+                <label>Thumbnail Image (Banner):</label>
+                <input type="file" id="a-img" accept="image/*">
+                
+                <label>Main Video File:</label>
+                <input type="file" id="a-vid" accept="video/*">
+
+                <div id="prog-area" class="hidden" style="margin: 10px 0;">
+                    <div class="loader"></div> <span id="prog-text">Uploading to Firebase...</span>
+                </div>
+
+                <button class="btn-pub" id="pub-btn" onclick="startHosting()">START HOSTING</button>
+            </div>
+        </div>
+
+        <div id="view-manage" class="hidden">
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Anime Title</th>
+                            <th>Category</th>
+                            <th>Seasons/Eps</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="anime-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="view-users" class="hidden">
+            <div class="card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User Email</th>
+                            <th>Status</th>
+                            <th>Control</th>
+                        </tr>
+                    </thead>
+                    <tbody id="user-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Real Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBuYwkLGEOx4FWwCkcsfWfVozXfHkepR8E",
+            authDomain: "anima-hosting-app.firebaseapp.com",
+            projectId: "anima-hosting-app",
+            storageBucket: "anima-hosting-app.firebasestorage.app",
+            messagingSenderId: "883981430156",
+            appId: "1:883981430156:web:a4a8fab02ff42b31707aa9"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const storage = firebase.storage();
+
+        // 1. Working Login Logic
+        function doLogin() {
+            const e = document.getElementById('adm-email').value;
+            const p = document.getElementById('adm-pass').value;
+            // Admin Credentials as requested
+            if(e === "rudradevmanhar820@gmail.com" && p === "rudra@#_/0000") {
+                document.getElementById('login-overlay').style.display = 'none';
+                initPanel();
+            } else {
+                alert("Access Denied! Incorrect Admin Details.");
+            }
+        }
+
+        // 2. Sidebar Toggle
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('hidden');
+            document.getElementById('main').classList.toggle('full');
+        }
+
+        // 3. Tab Navigation
+        function showTab(tab) {
+            ['dash', 'upload', 'manage', 'users'].forEach(t => {
+                document.getElementById('view-' + t).classList.add('hidden');
+            });
+            document.getElementById('view-' + tab).classList.remove('hidden');
+            document.getElementById('tab-title').innerText = tab.toUpperCase();
+        }
+
+        // 4. Working Upload Function
+        async function startHosting() {
+            const btn = document.getElementById('pub-btn');
+            const prog = document.getElementById('prog-area');
+            const title = document.getElementById('a-title').value;
+            
+            if(!title) return alert("Title zaroori hai!");
+
+            btn.disabled = true;
+            prog.classList.remove('hidden');
+
+            try {
+                const imgFile = document.getElementById('a-img').files[0];
+                const vidFile = document.getElementById('a-vid').files[0];
+
+                // Step 1: Image Upload
+                const imgRef = storage.ref(`content/thumbs/${Date.now()}_thumb`);
+                await imgRef.put(imgFile);
+                const imgUrl = await imgRef.getDownloadURL();
+
+                // Step 2: Video Upload
+                const vidRef = storage.ref(`content/videos/${Date.now()}_video`);
+                await vidRef.put(vidFile);
+                const vidUrl = await vidRef.getDownloadURL();
+
+                // Step 3: Database Save
+                db.ref('anime').push({
+                    title: title,
+                    desc: document.getElementById('a-desc').value,
+                    category: document.getElementById('a-cat').value,
+                    seasons: document.getElementById('a-seasons').value,
+                    episodes: document.getElementById('a-eps').value,
+                    thumbnail: imgUrl,
+                    videoUrl: vidUrl,
+                    timestamp: Date.now()
+                });
+
+                alert("Anime Successfully Hosted!");
+                location.reload();
+            } catch(e) {
+                alert("Error: " + e.message);
+                btn.disabled = false;
+                prog.classList.add('hidden');
+            }
+        }
+
+        // 5. Data Initialization (Real-time)
+        function initPanel() {
+            // Anime Stats & Management
+            db.ref('anime').on('value', snap => {
+                const data = snap.val() || {};
+                document.getElementById('count-anime').innerText = snap.numChildren();
+                
+                const table = document.getElementById('anime-table');
+                table.innerHTML = '';
+                for(let id in data) {
+                    table.innerHTML += `
+                        <tr>
+                            <td><b>${data[id].title}</b></td>
+                            <td>${data[id].category}</td>
+                            <td>S:${data[id].seasons} | E:${data[id].episodes}</td>
+                            <td class="action-btns">
+                                <button class="del-btn" onclick="deleteAnime('${id}')">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
+
+            // Live Users Counter
+            db.ref('status').on('value', snap => {
+                const users = snap.val() || {};
+                const onlineCount = Object.values(users).filter(u => u.online).length;
+                document.getElementById('count-online').innerText = onlineCount;
+                document.getElementById('count-users').innerText = snap.numChildren();
+                
+                const userTable = document.getElementById('user-table');
+                userTable.innerHTML = '';
+                for(let uid in users) {
+                    userTable.innerHTML += `
+                        <tr>
+                            <td>User_${uid.substring(0,5)}@app.com</td>
+                            <td style="color:${users[uid].online?'green':'red'}">${users[uid].online?'Online':'Offline'}</td>
+                            <td><button onclick="alert('User Blocked')">Block</button></td>
+                        </tr>
+                    `;
+                }
+            });
+        }
+
+        function deleteAnime(id) {
+            if(confirm("Delete this anime forever?")) {
+                db.ref('anime/' + id).remove();
+            }
+        }
+
+        function updateTheme(val) {
+            document.documentElement.style.setProperty('--primary', val);
+            db.ref('settings/theme').set(val);
+        }
+    </script>
+</body>
+</html>

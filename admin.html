@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel - Anime Stream</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; display: flex; }
+        .sidebar { width: 250px; background: #2c3e50; color: white; height: 100vh; padding: 20px; }
+        .main { flex: 1; padding: 30px; overflow-y: auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, textarea, select { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #f47521; color: white; border: none; padding: 12px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .anime-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
+        .delete-btn { background: #e74c3c; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>Admin Panel</h2>
+        <p>Manage Your App</p>
+        <hr>
+        <div id="stats">Users: <span id="userCount">0</span></div>
+    </div>
+
+    <div class="main">
+        <div class="card">
+            <h3>Upload New Anime</h3>
+            <input type="text" id="aniTitle" placeholder="Anime Title">
+            <textarea id="aniDesc" placeholder="Description"></textarea>
+            <input type="text" id="aniCategory" placeholder="Category (e.g. Action, Romance)">
+            <label>Seasons (1-100):</label>
+            <input type="number" id="aniSeasons" min="1" max="100" value="1">
+            <label>Episodes (1-900):</label>
+            <input type="number" id="aniEpisodes" min="1" max="900" value="12">
+            
+            <label>Thumbnail Image:</label>
+            <input type="file" id="aniThumb" accept="image/*">
+            
+            <label>Video File (Anime Source):</label>
+            <input type="file" id="aniVideo" accept="video/*">
+            
+            <button onclick="uploadAnime()">Upload & Host Anime</button>
+            <p id="status"></p>
+        </div>
+
+        <div class="card">
+            <h3>Existing Anime Content</h3>
+            <div id="animeList"></div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAaKOFvJv-7dWDYruOMDgL0nKovFfQvmII",
+            authDomain: "fooddelivery-b1f9b.firebaseapp.com",
+            databaseURL: "https://fooddelivery-b1f9b-default-rtdb.firebaseio.com",
+            projectId: "fooddelivery-b1f9b",
+            storageBucket: "fooddelivery-b1f9b.firebasestorage.app",
+            messagingSenderId: "403304113348",
+            appId: "1:403304113348:web:726235578f8b59e9ddd591"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const storage = firebase.storage();
+
+        // Load Anime List
+        db.ref('anime').on('value', snapshot => {
+            const list = document.getElementById('animeList');
+            list.innerHTML = '';
+            snapshot.forEach(child => {
+                list.innerHTML += `
+                    <div class="anime-item">
+                        <span><strong>${child.val().title}</strong> (${child.val().episodes} Eps)</span>
+                        <button class="delete-btn" onclick="deleteAnime('${child.key}')">Delete</button>
+                    </div>
+                `;
+            });
+        });
+
+        // Upload Function
+        async function uploadAnime() {
+            const title = document.getElementById('aniTitle').value;
+            const thumbFile = document.getElementById('aniThumb').files[0];
+            const videoFile = document.getElementById('aniVideo').files[0];
+            const status = document.getElementById('status');
+
+            if(!title || !thumbFile || !videoFile) return alert("Please fill all fields");
+
+            status.innerText = "Uploading files... please wait.";
+
+            // Upload Image
+            const thumbRef = storage.ref(`thumbs/${Date.now()}_${thumbFile.name}`);
+            await thumbRef.put(thumbFile);
+            const thumbUrl = await thumbRef.getDownloadURL();
+
+            // Upload Video
+            const videoRef = storage.ref(`videos/${Date.now()}_${videoFile.name}`);
+            await videoRef.put(videoFile);
+            const videoUrl = await videoRef.getDownloadURL();
+
+            // Save to DB
+            await db.ref('anime').push({
+                title: title,
+                description: document.getElementById('aniDesc').value,
+                category: document.getElementById('aniCategory').value,
+                seasons: document.getElementById('aniSeasons').value,
+                episodes: document.getElementById('aniEpisodes').value,
+                thumbnail: thumbUrl,
+                videoUrl: videoUrl
+            });
+
+            status.innerText = "Successfully Uploaded!";
+            resetForm();
+        }
+
+        function deleteAnime(id) {
+            if(confirm("Delete this anime?")) db.ref('anime').child(id).remove();
+        }
+
+        function resetForm() {
+            document.querySelectorAll('input').forEach(i => i.value = '');
+        }
+    </script>
+</body>
+</html>
